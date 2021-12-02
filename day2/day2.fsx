@@ -77,37 +77,40 @@ let (|ParseRegex|_|) regex str =
    then Some (List.tail [ for x in m.Groups -> x.Value ])
    else None
 
-// Parses an instruction
-let parseInstruction str =
-   match str with
-     | ParseRegex "forward (\d).*" [Integer n]
-          -> Forward n
-     | ParseRegex "down (\d).*" [Integer n]
-          -> Down n
-     | ParseRegex "up (\d).*" [Integer n]
-          -> Up n
-     | _ -> failwith "unexpected line in data set"
+let (|Forward|_|) = function
+    | ParseRegex "forward (\d+)" [Integer n] -> Forward n |> Some
+    | _ -> None
+let (|Up|_|) = function
+    | ParseRegex "up (\d+)" [Integer n] -> Up n |> Some
+    | _ -> None
+let (|Down|_|) = function
+    | ParseRegex "down (\d+)" [Integer n] -> Down n |> Some
+    | _ -> None
 
-// take an accumulator and an instruction, apply the instruction to the accumulator
-let part1f (hpos,d) = function
-    | Forward n -> hpos+n,d
-    | Up n -> hpos,d-n
-    | Down n -> hpos, d+n
+
+let parseInstructionPart1 (hpos, depth) = function
+    | Forward n -> (hpos + n, depth)
+    | Up n -> (hpos, depth-n)
+    | Down n -> (hpos, depth+n)
+    | _ -> failwith "Unexpected instruction"
+
+let parseInstructionPart2 (hpos, depth, aim) = function
+    | Forward n -> (hpos + n, depth + n * aim, aim)
+    | Up n -> (hpos, depth, aim - n)
+    | Down n -> (hpos, depth, aim + n)
+    | _ -> failwith "Unexpected instruction"
+
+
 // Recurse through the list of input, parsing and applying instructions as we go
 let rec part1 xs acc =
     match xs with
-        | x::xs -> parseInstruction x |> part1f acc |> part1 xs
+        | x::xs -> parseInstructionPart1 acc x |> part1 xs
         | _ -> let (hpos,d) = acc in hpos*d
 
-// take an accumulator and an instruction, apply the instruction to the accumulator
-let part2f (hpos,d,aim) = function
-    | Forward n -> hpos+n, d + aim * n, aim
-    | Up n -> hpos,d,aim-n
-    | Down n -> hpos, d,aim+n
 // Recurse through the list of input, parsing and applying instructions as we go
 let rec part2 xs acc =
     match xs with
-        | x::xs -> parseInstruction x |> part2f acc |> part2 xs
+        | x::xs -> parseInstructionPart2 acc x |> part2 xs
         | _ -> let (hpos,d,_) = acc in hpos*d
 
 part1 data (0,0) |> printfn "Part 1 solution: %d"
