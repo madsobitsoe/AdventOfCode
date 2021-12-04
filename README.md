@@ -1,4 +1,5 @@
-# Advent of Code 2021
-Just my solutions for advent of code 2021
+# Advent of Code 
+Just my solutions for Advent of Code
 
 In general solved using F#.
+
