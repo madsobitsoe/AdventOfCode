@@ -108,26 +108,22 @@ let shouldFlip tile tiles =
         | (pos,Black) -> let len = List.length bn in (len = 0 || len > 2)
             
 
-let rec nextDay n tiles =
+let rec nextDay n (tiles:Lazy<tile list>) =
     match n with
-        | 0 -> tiles
+        | 0 -> tiles.Force()
         | n ->
-            if n % 10 = 0 then
-                printfn "Days left: %d" n
-                List.filter (fun (_,c) -> c = Black) tiles
-                |> List.length
-                |> printfn "Current black tiles: %d"
-                
             // For every tile, add it's neighbors
-            let tiles' = List.foldBack addNeighbors tiles tiles
-            // Then collect a list of tiles to be flipped and flip them
-            let toFlip = List.filter (fun x -> shouldFlip x tiles') tiles' 
-            let tiles'' = List.map (flipTile' toFlip) tiles' 
+            let tiles'' = lazy(
+                 let tiles' = lazy(List.foldBack addNeighbors (tiles.Force()) (tiles.Force()))
+                 // Then collect a list of tiles to be flipped and flip them
+                 let toFlip = lazy(List.filter (fun x -> shouldFlip x (tiles'.Force())) (tiles'.Force()))
+                 List.map (flipTile' (toFlip.Force())) (tiles'.Force()) )
             nextDay (n-1) tiles''
 
 
-printfn "Computing part 2. Wait for it..."
-nextDay 100 flipTiles
+printfn "Computing part 2. Wait for it... (for a long time)"
+nextDay 100 (lazy(flipTiles))
 |> List.filter (fun (_,c) -> c = Black)
 |> List.length
 |> printfn "Solution part 2: %d"
+
