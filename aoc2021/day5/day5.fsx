@@ -53,9 +53,7 @@ let computeLine (p1, p2) =
 data |> onlyHorVer
 |> List.map computeLine
 |> List.concat
-|> List.sort
 |> List.countBy id
-|> List.sortBy (fun (_,c) -> c)
 |> List.filter (fun (_,c) -> c > 1)
 |> List.length
 |> printfn "Solution part 1: %d" 
@@ -87,9 +85,7 @@ let drawGrid ps =
 data
 |> List.map computeLine
 |> List.concat
-|> List.sort
 |> List.countBy id
-|> List.sortBy (fun (_,c) -> c)
 |> List.filter (fun (_,c) -> c > 1)
 |> List.length
 |> printfn "Solution part 2: %d" 
