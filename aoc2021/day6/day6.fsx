@@ -72,14 +72,42 @@ let rec steps' n xs =
 data
 |> getCounts
 |> steps' 80
-|> List.map (fun (_,c) -> c)
-|> List.sum
+|> List.sumBy (fun (_,c) -> c)
 |> printfn "Solution part 1 (with part 2 approach): %d"
 
 // part 2
 data
 |> getCounts
 |> steps' 256
-|> List.map (fun (_,c) -> c)
-|> List.sum
+|> List.sumBy (fun (_,c) -> c)
 |> printfn "Solution part 2: %d"
+
+
+// And because unfolds are all the rage in my world right now
+// here's an "awesome" solution using unfold to generate each step
+let ufstep : (((int * int64) list) -> (((int * int64) * ((int * int64) list)) option))  = function
+    | [] -> None
+    | (0,count)::xs -> Some ((6,count), ((9,count)::xs))
+    | (age,count)::xs -> Some (((age-1),count),xs)
+
+let rec ufsteps n xs =
+    match n with
+        | 0 -> xs
+        | n ->
+            xs
+            |> List.sortBy (fun (age,_) -> age)
+            |> merge' []
+            |> List.unfold ufstep 
+            |> ufsteps (n-1) 
+
+data
+|> getCounts
+|> ufsteps 80
+|> List.sumBy (fun (_,c) -> c)
+|> printfn "Unfolded solution part 1: %d"
+
+data
+|> getCounts
+|> ufsteps 256
+|> List.sumBy (fun (_,c) -> c)
+|> printfn "Unfolded solution part 2: %d"
