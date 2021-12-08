@@ -1,89 +1,66 @@
 open System.IO
+open System.Text.RegularExpressions
 
 let explode (s:string) : char list = [for c in s do yield c]
 
-let readFile file  =
-    File.ReadAllLines file
-    |> Array.map (fun (s:string) -> s.Split("|"))
-    |> Array.map Array.toList
+let (|ParseRegex|_|) regex str =
+   let m = Regex(regex).Match(str)
+   if m.Success
+   then Some (List.tail [ for x in m.Groups -> x.Value ])
+   else None
+
+let (|StringList|_|) (str:string) =
+    str.Split(" ") |> Array.filter (fun s -> s <> "") |> Array.toList |> Some
+
+let (|Entry|_|) = function
+    | ParseRegex "((?:[a-z]+\W*){10})\|((?:\W*[a-z]+){4})" [StringList ls; StringList rs] -> Some (ls, rs)    
+    | _ -> None
+
+let parseEntry = function
+    | Entry entry -> entry
+    | _ -> failwith "No valid entry found"
+
+// Get a list of tuples, (string list * string list)
+let readFile filename =
+    File.ReadAllLines filename
+    |> Array.map parseEntry
     |> List.ofArray
-    |> List.map (fun x -> List.map (fun (s:string) -> s.Split(" ")) x )
-    |> List.map (fun x -> List.map (Array.toList ) x)
-    |> List.map (fun x -> List.map (List.filter (fun (s:string) -> s <> "")) x)
 
-
+let test = readFile "test.txt"    
 let data = readFile "input.txt"
-let test = readFile "test.txt"
 
-
-let rec countSeg acc (xs:string list) =
-    match xs with
+// Part 1
+let rec countSeg acc : string list -> int = function
     | [] -> acc
     | x::xs ->
         let len = x.Length
-        if len = 2 || len = 4 || len = 3 || len = 7 then countSeg (acc+1) xs
+        if List.contains len [2;3;4;7] then countSeg (acc+1) xs
         else countSeg acc xs
-        
-let rec countSegs acc xs =
-    match xs with
-        | [] -> acc
-        | x::y::xs -> countSegs (acc + (countSeg 0 y)) xs
-        | _ -> failwith "bad data"
-            
 
-List.fold countSegs 0 data
+let rec countSegs acc = function
+    | [] -> acc
+    | (_,segs)::xs -> countSegs (acc + countSeg 0 segs) xs
+
+
+countSegs 0 data
 |> printfn "Solution part 1: %d"
 
+// Part 2
+type bindings = Map<char,int>
+// segment-occurences in digit strings:
+// f = 9 ,a = 8 ,c = 8 ,d = 7 ,g = 7 ,b = 6 ,e = 4
+let appearancesToMap (pot:bindings) (c,appears)  =
+    match appears with
+        | 4 -> Map.add c 5 pot
+        | 6 -> Map.add c 2 pot
+        | 8 ->
+            // Check if this is the top piece
+            // if not, it is the third
+            if Map.containsKey c pot then pot 
+            else Map.add c 3 pot
+        | 9 -> Map.add c 6 pot
+        | _ -> pot
 
-// 1 == 2 segments
-// 4 == 4 segments
-// 7 == 3 segments
-// 8 = 7 segments
-
-
-
-let updateBindings x bindings (pot: Map<char,int list>) =
-    let entry = pot.[x]
-    if List.length entry <= List.length bindings then pot
-    else Map.add x bindings pot
-// Find binding for the top segment    
-let shrink x (pot: Map<char,int list>) =
-    let x' = explode x
-    let len = List.length x'
-    match len with
-        // We know this is the digit 1
-        | 2 ->
-            // get current potential bindings for each char in x'
-            List.fold (fun acc x -> updateBindings x [3;6] acc) pot x'
-            // We know this is the digit 7
-        | 3 ->
-            // find the char that has the largest binding
-            // it has to be "the top of the seven", i.e. only binding = 1 is possible
-            // List.map (fun x -> (x, pot.[x])) x'
-            let topseg = List.maxBy (fun x -> List.length (pot.[x])) x'
-            // |> List.map (fun (x,_) -> x)
-            updateBindings topseg [1] pot
-            
-            // We know this is the digit 4
-        | 4 ->  pot
-            // Two of the chars should have pot bindings of [3;6] or less (from digit 1)
-            // The other two will be either coord 2 or 4
-            // let binds = List.filter (fun x -> List.length (pot.[x]) > 2)  x'
-            // List.fold (fun acc x -> updateBindings x [2;4] acc) pot binds
-            // We know this is 2, 3 or 5
-        | 5 ->  pot
-            // we know this is 0, 6 or 9
-        | 6 -> pot
-        // We know this is 8 (but uses all, so fuck me
-        | 7 -> pot
-        //     // get current potential bindings for each char in x'
-        //     List.fold (fun acc x -> updateBindings x [2;3;4;6] acc) pot x'
-            
-        | _ -> failwith "nope"
-
-
-// Find bindings for segments b, c, e and f
-let appears c xs = List.contains c xs
 let appearances xs =
     // For each char
     // Count the occurence of it in each of the strings
@@ -91,62 +68,27 @@ let appearances xs =
     let xs' = List.map explode xs
     List.map (fun c -> List.filter (List.contains c) xs' |> (fun x -> (c,List.length x))) chars
 
-// segment-occurences in digit strings
-// f = 9
-// a = 8
-// c = 8
-// d = 7
-// g = 7
-// b = 6
-// e = 4
-let appearancesToMap (c,appears) (pot:Map<char,int list>) =
-    match appears with
-        | 4 -> Map.add c [5] pot
-        | 6 -> Map.add c [2] pot
-        | 7 ->
-            if List.length (pot.[c]) > 2 then 
-                Map.add c [4;7] pot
-            else pot
-        | 8 ->
-            // Check if this is the top piece
-            // if not, it is the third
-            if List.length (pot.[c]) = 1 then pot
-            else Map.add c [3] pot
-        | 9 -> Map.add c [6] pot
-        | _ -> pot
-
-// Find binding for segment d
-// Take the input list
-// segment d is the char in the 4-char string, that does not have a binding
-let findD xs (pot:Map<char,int list>) =
+let findD xs (pot:bindings) =
     let xs' = List.map explode xs
     let binds = List.filter (fun x -> List.length x = 4) xs' |> List.head
-    List.fold (fun (acc:Map<char,int list>) (x:char) -> if List.length (acc.[x]) > 1 then Map.add x [4] acc else acc) pot binds
-    
-// g is the only char in the map without a binding
-let findG (pot: Map<char,int list>) =
-    let elm = Map.toList pot |> List.filter (fun (c,b) -> List.length b > 1) |> List.map fst |> List.head
-    Map.add elm [7] pot
+    List.fold (fun (acc:bindings) (x:char) -> if Map.containsKey x acc then acc else Map.add x 4 acc) pot binds
+
+// segment g is the only char in the map without a binding
+let findG (pot: bindings) =
+    let chars = ['a'..'g']
+    List.fold (fun map k -> if Map.containsKey k map then map else Map.add k 7 map) pot chars
 
 
-let getBindings inputData =
-    let indices = [1..8]
-    let potentials  =
-        Map.ofList [('a', indices); ('b', indices); ('c', indices); ('d', indices); ('e', indices); ('f', indices); ('g', indices)]
-    match inputData with
-        | x::_::_ ->
-            let step1 =
-                List.sortBy (fun (s:string) -> s.Length) x
-                |> List.fold (fun acc x -> shrink x acc) potentials
-            let step2 =
-                appearances x
-                |> List.fold (fun acc x -> appearancesToMap x acc) step1
-            let step3 =
-                findD x step2
-            let step4 = findG step3 |> Map.map (fun k v -> List.head v)
-            step4
-        | _ -> failwith "error!"
-            
+let getBindings ls =
+    // First, figure out the top segment, segment 'a'
+    let top = List.filter (fun (s:string) -> s.Length <= 3) ls |> List.map explode |> List.concat |> List.countBy id |> List.filter (fun (_,c) -> c = 1) |> Map.ofList 
+    // Now we can find segments b,c,e,f based on their occurrence in strings on LHS
+    let step2 = appearances ls |> List.fold appearancesToMap top
+    // Now we can find segment D, which will be the char in the 4-char string without a binding
+    let step3 = findD ls step2
+    // And lastly, the char without a binding is segment 'g'
+    let step4 = findG step3
+    step4
 
 let toDigit xs =
     let x = List.sort xs
@@ -163,25 +105,18 @@ let toDigit xs =
     | [1;2;3;4;6;7] -> '9'
     | _ -> failwith <| sprintf "bad digit! %A" x
 
-    
-let entryToValue (bindings:Map<char,int>) x =
+let entryToValue (bindings:bindings) x =
     let entry = explode x
     List.map (fun x -> bindings.[x]) entry
 
-
-// For each entry, get bindings
-// Then map the entry to a digit with those bindings
-let solveEntry (x:string list list) =
-    let bindings = getBindings x
-    match x with
-        | x::y::_ ->
-            List.map (entryToValue bindings) y
-            |> List.map toDigit
-            |> List.foldBack (fun c acc -> string c + acc) <| ""
-            |> int
-        | _ -> failwith "bad solve entry"
-
+let solveEntry (ls,rs) =
+    let bindings = getBindings ls
+    List.map (entryToValue bindings) rs
+    |> List.map toDigit
+    |> List.foldBack (fun c acc -> string c + acc) <| ""
+    |> int
 
 List.map solveEntry data
 |> List.sum
 |> printfn "Solution part 2: %d"
+
