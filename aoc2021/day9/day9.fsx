@@ -97,3 +97,7 @@ let findBasins xs =
 
 findBasins data
 |> printfn "Solution part 2: %d"
+
+
+
+// To make this better, only find basins based on low-points (you idiot!) 
