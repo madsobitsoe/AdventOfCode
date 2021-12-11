@@ -6,7 +6,9 @@ let readFile file  =
     File.ReadAllText file
     |> (fun (s:string) -> s.Split("\n\n"))
     |> Array.map (fun (s:string) -> s.Replace(" ", "\n").Split("\n") |> Array.toList)
+    |> Array.map (List.filter (fun s -> s <> ""))
     |> Array.toList
+    |> List.filter (fun x -> x <> [])
 
     
 let data = readFile "input.txt"
