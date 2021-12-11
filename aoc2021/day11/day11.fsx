@@ -20,7 +20,13 @@ let test = readFile "test.txt"
 let data = readFile "input.txt"
 
 let neighbors xs (x,y) =
-    seq { for x' in x - 1 .. x + 1  do for y' in y-1 .. y+1 do if x' >= 0 && x' < Array2D.length2 xs && y' >= 0 && y' < Array2D.length1 xs && (x,y) <> (x', y') then yield (x' ,y') } |> List.ofSeq
+    seq { for x' in x - 1 .. x + 1  do
+          for y' in y-1 .. y+1 do
+          if
+              x' >= 0 && x' < Array2D.length2 xs
+              && y' >= 0 && y' < Array2D.length1 xs
+              && (x,y) <> (x', y')
+          then yield (x' ,y') } |> List.ofSeq
 
 let increaseEnergy (x,y) (xs:int[,]) =
     xs.[x,y] <- xs.[x,y] + 1 
@@ -31,7 +37,7 @@ let flash (x,y) (xs:int[,]) =
         do xs.[x,y] <- -100
         // For each neighbor, inc by 1
         let n = neighbors xs (x,y)
-        List.iter (fun (x,y) -> xs.[x,y] <- xs.[x,y] + 1) n
+        List.iter (fun pos -> increaseEnergy pos xs) n
 
 let step (xs:int[,]) =
     let copy = Array2D.copy xs    
@@ -44,7 +50,12 @@ let step (xs:int[,]) =
         Array2D.iteri (fun x y _-> flash (x,y) copy) copy    
     
     let mutable flashes = 0
-    Array2D.iteri (fun x y _ -> if copy.[x,y] < 0 || copy.[x,y] > 9 then xs.[x,y] <- 0; flashes <- flashes + 1 else xs.[x,y] <- copy.[x,y]) copy
+    Array2D.iteri (fun x y _ ->
+                   if copy.[x,y] < 0 || copy.[x,y] > 9
+                   then
+                       xs.[x,y] <- 0
+                       flashes <- flashes + 1
+                   else xs.[x,y] <- copy.[x,y]) copy
     flashes
 
 // Part 1
