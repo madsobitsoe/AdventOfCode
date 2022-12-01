@@ -29,18 +29,18 @@ let reconstruct_path cameFrom current =
         // total_path.prepend(current)
     total_path
 
-let gscore map node =
+// let gscore map node =
+//     match Map.tryFind node map with
+//         | Some c -> c
+//         | None -> 1UL <<< 63
+
+
+let inline fscore map node =
     match Map.tryFind node map with
         | Some c -> c
         | None -> 1UL <<< 63
 
-
-let fscore map node =
-    match Map.tryFind node map with
-        | Some c -> c
-        | None -> 1UL <<< 63
-
-let neighbors maxy maxx (y,x) =
+let inline neighbors maxy maxx (y,x) =
     [y-1,x;y+1,x;y,x-1;y,x+1] |> List.filter (fun (y,x) -> y >= 0 && x >= 0 && y <= maxy && x <= maxx)
 
 
@@ -51,11 +51,12 @@ let A_Star start goal (all_nodes:uint64[,]) =
     
     let mutable cameFrom = Map []
 
-    let mutable gScoreMap = Map [start,0UL]
+    // let mutable gScoreMap = Map [start,0UL]
     let mutable fScoreMap = Map [start,0UL]
 
     let mutable total_path = []
-    while Set.count openSet > 0 do
+    // while Set.count openSet > 0 do
+    while not (Set.isEmpty openSet) do
         let withFScores = Set.map (fun x -> fscore fScoreMap x,x) openSet
         let current = Set.minElement withFScores |> (fun (_,x) -> x)
         if current = goal then
@@ -63,13 +64,13 @@ let A_Star start goal (all_nodes:uint64[,]) =
             openSet <- set []
         else
             openSet <- Set.remove current openSet
-
             for n in (nf current) do
                 let ny,nx = n
-                let tentative_gScore = gscore gScoreMap current + all_nodes.[ny,nx]
-                if tentative_gScore < gscore gScoreMap n then
+                // let tentative_gScore = gscore gScoreMap current + all_nodes.[ny,nx]
+                let tentative_gScore = fscore fScoreMap current + all_nodes.[ny,nx]                
+                if tentative_gScore < fscore fScoreMap n then
                     cameFrom <- Map.add n current cameFrom
-                    gScoreMap <- Map.add n tentative_gScore gScoreMap
+                    // gScoreMap <- Map.add n tentative_gScore gScoreMap
                     fScoreMap <- Map.add n tentative_gScore fScoreMap 
                     if not (Set.contains n openSet) then
                         openSet <- Set.add n openSet
@@ -88,7 +89,7 @@ A_Star (0,0) p1goal data
 |> sumPath data
 |> printfn "Solution part 1: %A"
 
-let wrap n = if n+1UL > 9UL then 1UL else n+1UL
+let inline wrap n = if n+1UL > 9UL then 1UL else n+1UL
     
 let toBigCave (xs:uint64[,]) =
     let y,x = Array2D.length1 xs , Array2D.length2 xs

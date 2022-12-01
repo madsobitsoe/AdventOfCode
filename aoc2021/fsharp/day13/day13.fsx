@@ -76,6 +76,9 @@ let p2 = List.fold (fun acc inst -> match inst with | X x -> foldX x acc | Y y -
 printfn "Solution part 2:"
 for y = 0 to Array2D.length1 p2 - 1 do
     for x = 0 to Array2D.length2 p2 - 1 do
-        printf "%c" (p2.[y,x])
+        if p2.[y,x] = '#' then 
+            printf "%c" (p2.[y,x])
+        else
+            printf "."
     printfn ""
 
