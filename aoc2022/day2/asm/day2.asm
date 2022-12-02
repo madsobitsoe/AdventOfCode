@@ -33,14 +33,12 @@ _start:
         pop rcx                 ; size of data in rcx
         push rcx
 	mov qword [totalPointsPart1], 0
-	mov qword [entriesHandledPart1], 0
 	mov qword [totalPointsPart2], 0
-	mov qword [entriesHandledPart2], 0
-	call handleEntriesPart1
-	mov rax, [fileContentsAddr]
-	pop rcx
-	push rcx
-	call handleEntriesPart2	
+	call handleEntries
+	;; mov rax, [fileContentsAddr]
+	;; pop rcx
+	;; push rcx
+	;; call handleEntriesPart2	
 	mov rax, [totalPointsPart1]
         call printResult
 	mov rax, [totalPointsPart2]
@@ -52,7 +50,7 @@ _start:
         call exitSuccess
 
 	
-handleEntriesPart1:
+handleEntries:
         ;; Preconds:
         ;; addr in rax
         ;; length of data in rcx
@@ -60,19 +58,18 @@ handleEntriesPart1:
         ;; totalPoints updated with result
 	push rax
 	push rcx
-handleEntriesLoopPart1:
-	call handleEntryPart1
-	inc qword [entriesHandledPart1]
+handleEntriesLoop:
+	call handleEntry
 	pop rcx
 	sub rcx, 4
 	push rcx
 	cmp rcx, 0
-	jg handleEntriesLoopPart1
+	jg handleEntriesLoop
 	pop rcx
 	pop rax
 	ret
 
-handleEntryPart1:
+handleEntry:
         ;; preconds:
         ;; addr of start of entry in rax
         ;; postconds:
@@ -84,136 +81,15 @@ handleEntryPart1:
 	xor edi, edi
 	xor edx, edx
 	movzx edi,  byte [rax] 	; opponent choice
-	sub edi, 0x40 		; rock=1, paper=2,scissors=3
+	sub edi, 0x41 		; rock=0, paper=1,scissors=2
 	add rax, 2
 	movzx edx, byte [rax] 	; "my" choice
-	sub edx, 0x57 		;rock=1, paper=2, scissors=3
-	add qword [totalPointsPart1], rdx 	; add the player choice to the score
-	add rax, 2			;
-	cmp edi, edx
-	jne notDraw
-	add qword [totalPointsPart1], 3
-	ret
-notDraw:
-	dec edi
-	test edi, edi
-	jz enemyRock
-	dec edi
-	test edi, edi
-	jz enemyPaper
-enemyScissors:
-	;; we either played rock or paper
-	cmp edx, 1
-	je playerWin
-	ret
-enemyRock:
-	;;  We either played paper or scissors
-	cmp edx, 2 		;paper
-	je playerWin
-	ret 			; no points for rock vs scissor 
-
-enemyPaper:	
-	cmp edx, 3 		; did we play scissors and win?
-	je playerWin
-	ret 			; else return immediately
-playerWin:	
-	add qword [totalPointsPart1], 6
-	ret
-
-	;;  ================================
-	;;  Part 2 below
-	;;  ================================
-handleEntriesPart2:
-        ;; Preconds:
-        ;; addr in rax
-        ;; length of data in rcx
-        ;; postconds:
-        ;; totalPoints updated with result
-	push rax
-	push rcx
-handleEntriesLoopPart2:
-	call handleEntryPart2
-	inc qword [entriesHandledPart2]
-	pop rcx
-	sub rcx, 4
-	push rcx
-	cmp rcx, 0
-	jg handleEntriesLoopPart2
-	pop rcx
-	pop rax
-	ret
-
-handleEntryPart2:
-        ;; preconds:
-        ;; addr of start of entry in rax
-        ;; max number of bytes to read in rcx // should be 4 
-        ;; postconds
-	;; updates totalPoints
-        ;; returns address of next entry in rax
-	;; rock,     paper,  scissors
-	;; A = 0x41, B=0x42, C=0x43
-	;; X = 0x58, Y=0x59, Z=0x5A
-	;; diff is 23, (88-65), 0x17
-	xor edi, edi
-	xor edx, edx
-	movzx edi,  byte [rax] 	; opponent choice
-	sub edi, 0x40 		; rock=1, paper=2,scissors=3
-	add rax, 2
-	movzx edx, byte [rax] 	; "my" choice
-	sub edx, 0x58 		; lose=0, draw=1, win=2
-	;; add qword [totalPoints], rdx 	; add the player choice to the score
-	add rax, 2			;
-	test edx, edx
-	jz shouldLose
-	dec edx
-	jz shouldDraw
-shouldWin:
-	dec edi
-	test edi, edi
-	jz enemyRockWeWin
-	dec edi
-	test edi,edi
-	jz enemyPaperWeWin
-enemyScissorsWeWin:
-	add qword [totalPointsPart2], 7 ; 1 point for rock + 6 for win
-	ret
-enemyRockWeWin:
-	add qword [totalPointsPart2], 8 ; 2 for paper, 6 for win
-	ret
-enemyPaperWeWin:
-	add qword [totalPointsPart2], 9 ; 3 for scissors, 6 for win
-	ret
-shouldLose:
-	dec edi
-	test edi,edi
-	jz enemyRockWeLose
-	dec edi
-	test edi,edi
-	jz enemyPaperWeLose
-enemyScissorsWeLose:
-	add qword [totalPointsPart2], 2 ; 2 for paper, 0 for loss
-	ret
-enemyRockWeLose:
-	add qword [totalPointsPart2], 3 ; 3 for scissors, 0 for loss
-	ret
-enemyPaperWeLose:
-	add qword [totalPointsPart2], 1 ; 1 for rock, 0 for loss
-	ret
-shouldDraw:
-	dec edi
-	test edi,edi
-	jz drawRock
-	dec edi
-	test edi,edi
-	jz drawPaper
-drawScissors:
-	add qword [totalPointsPart2], 6 ; 3 for scissors, 3 for draw
-	ret
-drawRock:
-	add qword [totalPointsPart2], 4 ; 1 for rock, 3 for draw
-	ret
-drawPaper:
-	add qword [totalPointsPart2], 5 ; 2 for paper, 3 for draw
+	sub edx, 0x58 		;rock=0, paper=1, scissors=2
+	movzx rsi, byte [part1lookup + rdi * 4 + rdx]
+	add qword [totalPointsPart1], rsi 	; add to part1 score
+	movzx rsi, byte [part2lookup + rdi * 4 + rdx]
+	add qword [totalPointsPart2], rsi 	; add to part1 score
+	add rax, 2			; rax points at next entry
 	ret
 
 	;;  ================================
@@ -234,7 +110,6 @@ unmapMem:
         jne exitError
         ret                     ; Return from routine
 
-
 openFile:
         ;; Precond for openfile
         ;; pointer to filename should be in rax
@@ -252,8 +127,6 @@ openFile:
         cmp rax, 0
         jl exitError           ;Something went wrong. Exit gracefully with errno
         ret                     ; return to calling function (lol, label). fd is in rax
-
-
 
 readFileIntoMemory:
         ;; Preconds
@@ -279,8 +152,6 @@ readFileIntoMemory:
         jl exitError            ; exit with errno from syscal
         ret
 
-
-
 closeFile:
         ;; Preconds:
         ;; fd should be in rax
@@ -294,7 +165,6 @@ closeFile:
         cmp rax,0               ;Check for errors
         jl exitError            ;exit with errno from syscall if error
         ret                     ; else, return
-
 
 asciiToInt:
         ;; Preconds:
@@ -389,12 +259,12 @@ exit:
         syscall                 ; exit successfully
 
 
-        ;; section .data
+section .data
+part1lookup:	db 0x4, 0x8, 0x3, 0x00, 0x1, 0x5, 0x9, 0x0, 0x7, 0x2, 0x6, 0x0
+part2lookup:	db 0x3, 0x4, 0x8, 0x0, 0x1, 0x5, 0x9, 0x0, 0x2, 0x6, 0x7, 0x0
 section .bss
 ;; reserve 8 bytes for the memory address of the file we read
 fileContentsAddr:       resb 8
 ;; Reserve 8 bytes for accumulated score
 totalPointsPart1:	 resb 8
-entriesHandledPart1:	 resb 8
 totalPointsPart2:	 resb 8
-entriesHandledPart2:	 resb 8
