@@ -1,6 +1,35 @@
-global _start
-
 BITS 64
+  org 0x400000
+
+ehdr:           ; Elf64_Ehdr
+  db 0x7f, "ELF", 2, 1, 1, 0 ; e_ident
+  times 8 db 0
+  dw  2         ; e_type
+  dw  0x3e      ; e_machine
+  dd  1         ; e_version
+  dq  _start    ; e_entry
+  dq  phdr - $$ ; e_phoff
+  dq  0         ; e_shoff
+  dd  0         ; e_flags
+  dw  ehdrsize  ; e_ehsize
+  dw  phdrsize  ; e_phentsize
+  dw  1         ; e_phnum
+  dw  0         ; e_shentsize
+  dw  0         ; e_shnum
+  dw  0         ; e_shstrndx
+  ehdrsize  equ  $ - ehdr
+
+phdr:           ; Elf64_Phdr
+  dd  1         ; p_type
+  dd  5         ; p_flags
+  dq  0         ; p_offset
+  dq  $$        ; p_vaddr
+  dq  $$        ; p_paddr
+  dq  filesize  ; p_filesz
+  dq  filesize  ; p_memsz
+  dq  0x1000    ; p_align
+  phdrsize  equ  $ - phdr
+
 _start:
         mov r9, 1
         pop rdi               ; put no. of arguments in rdi
@@ -25,26 +54,28 @@ _start:
         call readFileIntoMemory
         cmp rax, 0
         jl exitError            ;exit if error reading file
-        mov [fileContentsAddr], rax ; store the address in .bss
+	mov r10, rax  ; store the address in r10
+        ;; mov [fileContentsAddr], rax ; store the address in .bss
         pop rax                 ; get fd
         call closeFile         ;; close the file
 
-        mov rax, [fileContentsAddr]
+
+	mov rax, r10 		; fileContentsAddr
         pop rcx                 ; size of data in rcx
         push rcx
-	mov qword [totalPointsPart1], 0
-	mov qword [totalPointsPart2], 0
+	mov r11, 0 		; part1Score
+	mov r12, 0 		; part2Score
 	call handleEntries
-	;; mov rax, [fileContentsAddr]
-	;; pop rcx
-	;; push rcx
-	;; call handleEntriesPart2	
-	mov rax, [totalPointsPart1]
+	;; push r11
+	push r12
+	mov rax, r11
         call printResult
-	mov rax, [totalPointsPart2]
+	pop r12
+	;; pop r11
+	mov rax, r12
         call printResult
 
-        mov rax, [fileContentsAddr]
+	mov rax, r10 		; fileContentsAddr
         pop rcx                 ; num of bytes to munmap
         call unmapMem
         call exitSuccess
@@ -56,6 +87,21 @@ handleEntries:
         ;; length of data in rcx
         ;; postconds:
         ;; totalPoints updated with result
+	;; int3
+	mov rbp, rsp
+	sub rsp, 60 		; Grab some stackspace for the lookup tables
+	;;  Part 1 lookup
+	mov dword [rsp],   0x00030804
+	mov dword [rsp+4], 0x00090501 
+	mov dword [rsp+8], 0x00060207
+	mov dword [rsp+12], 0x00000000
+	;;  part 2 lookup
+	mov dword [rsp+16], 0x00080403
+	mov dword [rsp+20], 0x00090501
+	mov dword [rsp+24], 0x00070602
+	mov dword [rsp+28], 0x00000000
+	mov rbx, rsp
+	add rsp, 60
 	push rax
 	push rcx
 handleEntriesLoop:
@@ -67,6 +113,7 @@ handleEntriesLoop:
 	jg handleEntriesLoop
 	pop rcx
 	pop rax
+	mov rsp, rbp
 	ret
 
 handleEntry:
@@ -78,6 +125,7 @@ handleEntry:
 	;; rock,     paper,  scissors
 	;; A = 0x41, B=0x42, C=0x43
 	;; X = 0x58, Y=0x59, Z=0x5A
+	;; int3
 	xor edi, edi
 	xor edx, edx
 	movzx edi,  byte [rax] 	; opponent choice
@@ -85,10 +133,18 @@ handleEntry:
 	add rax, 2
 	movzx edx, byte [rax] 	; "my" choice
 	sub edx, 0x58 		;rock=0, paper=1, scissors=2
-	movzx rsi, byte [part1lookup + rdi * 4 + rdx]
-	add qword [totalPointsPart1], rsi 	; add to part1 score
-	movzx rsi, byte [part2lookup + rdi * 4 + rdx]
-	add qword [totalPointsPart2], rsi 	; add to part1 score
+	lea rsi, [rbx + rdi * 4]
+	add rsi, rdx
+	movzx rsi, byte [rsi] ;; byte [rbx + (rdi * 4) + rdx] 
+	;; add r11, rsi 	; add to part1 score
+	add r11, rsi 	; add to part1 score	
+	add rbx, 16
+	lea rsi, [rbx + rdi * 4]
+	add rsi, rdx
+	movzx rsi, byte [rsi]
+	;; movzx rsi, byte [rbx + rdi * 4 + rdx]
+	add r12, rsi 		; add to part 2 score
+	sub rbx, 16
 	add rax, 2			; rax points at next entry
 	ret
 
@@ -259,12 +315,14 @@ exit:
         syscall                 ; exit successfully
 
 
-section .data
-part1lookup:	db 0x4, 0x8, 0x3, 0x00, 0x1, 0x5, 0x9, 0x0, 0x7, 0x2, 0x6, 0x0
-part2lookup:	db 0x3, 0x4, 0x8, 0x0, 0x1, 0x5, 0x9, 0x0, 0x2, 0x6, 0x7, 0x0
-section .bss
-;; reserve 8 bytes for the memory address of the file we read
-fileContentsAddr:       resb 8
-;; Reserve 8 bytes for accumulated score
-totalPointsPart1:	 resb 8
-totalPointsPart2:	 resb 8
+;; section .data
+;; part1lookup:	db 0x4, 0x8, 0x3, 0x00, 0x1, 0x5, 0x9, 0x0, 0x7, 0x2, 0x6, 0x0
+;; part2lookup:	db 0x3, 0x4, 0x8, 0x0, 0x1, 0x5, 0x9, 0x0, 0x2, 0x6, 0x7, 0x0
+;; section .bss
+;; ;; reserve 8 bytes for the memory address of the file we read
+;; fileContentsAddr:       resb 8
+;; ;; Reserve 8 bytes for accumulated score
+;; totalPointsPart1:	 resb 8
+;; totalPointsPart2:	 resb 8
+
+filesize  equ  $ - $$
