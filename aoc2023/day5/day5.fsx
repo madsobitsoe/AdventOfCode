@@ -1,18 +1,6 @@
 open System.IO
 open System.Text.RegularExpressions
 
-let explode (s:string) : char list = [for c in s do yield c]
-let isDigit (s:string) = Regex("[0-9]").IsMatch s
-let isDigitOrLetter (s:string) = Regex("[0-9a-zA-Z]").IsMatch s
-
-
-
-// Partial active pattern for parsing an int
-let (|Integer|_|) (str: string) =
-   let mutable intvalue = 0
-   if System.Int32.TryParse(str, &intvalue) then Some(intvalue)
-   else None
-
 let (|Long|_|) (str: string) =
     let mutable longValue = 0L
     if System.Int64.TryParse(str, &longValue) then Some longValue
@@ -24,25 +12,20 @@ let (|ParseRegex|_|) regex str =
    then Some (List.tail [ for x in m.Groups -> x.Value ])
    else None
 
-
 let (|Mapping|_|) = function
     | ParseRegex "(\d+) (\d+) (\d+)" [Long destination; Long source; Long size] -> Some (destination, source, size)
     | _ -> None
-
-
 
 let getMapping = function
     | Mapping m -> m
     | _ -> failwith "bad data"
 
-
 let rec translate map (d:int64)  =
     match map with
         | [] -> d
         | (dest,src,range)::xs ->
-            if src <= d && d <= src+range then dest + (d-src)
+            if src <= d && d <= src+range-1L then dest + (d-src)
             else translate xs d 
-
 
 let readFile file =
     File.ReadAllText file
@@ -54,7 +37,6 @@ let readFile file =
 
 //let data = readFile "test.txt"
 let data = readFile "input.txt"
-
 
 let seeds =
     List.head data |> List.head
@@ -81,20 +63,14 @@ List.map finalMap seeds
 |> printfn "Part 1: %d"
 
 
-let rec listToTuples xs : ('a * 'a) list =
-    match xs with
-        | [] -> []
-        | x::y::xs -> (x,y):: listToTuples xs
-        | _ -> failwith "oh heavens no"
-
-let brute (start:int64,stop:int64) =
-    let rec inner n stop (acc:int64) =
-        if n >= stop then acc
-        else
-            inner (n+1L) stop <| min (finalMap n) acc
-    inner start (start+stop) System.Int64.MaxValue
 
 // Part 2, seeds are now ranges goddamnit
+let rec listToTuples xs : (int64 * int64) list =
+    match xs with
+        | [] -> []
+        | x::y::xs -> (x,x+y-1L):: listToTuples xs
+        | _ -> failwith "oh heavens no"
+
 let seedsAsRanges =
     List.head data |> List.head
     |> (fun s -> s.Split " ")
@@ -102,8 +78,62 @@ let seedsAsRanges =
     |> Array.map int64
     |> List.ofArray
     |> listToTuples
-    |> List.map (fun x -> brute x)
+    |> List.map Some
 
 
-List.min seedsAsRanges
+let overlap (a:int64,b:int64) (x:int64,y:int64) =
+    if b < x || a > y then None
+    else if a <= x && b >= y then Some (x,y)
+    else if a >= x && b <= y then Some (a,b)
+    else if a <= x && b <= y then Some (x,b)
+    else Some (a,y)
+
+let splitRange (a:int64,b:int64) (x:int64,y:int64) =
+    let below =
+        if a >= x then None
+        else if b < x then Some (a,b)
+        else Some (a, x-1L)
+    let above =
+        if b <= y then None
+        else if a > y then Some (a,b)
+        else Some (y+1L,b)
+    let overlap = overlap (a,b) (x,y)
+    below,overlap,above
+        
+
+let translateRange' (destination:int64,source:int64,range:int64) (x:(int64 * int64) option) : ((int64*int64) option * (int64*int64) option list) =
+    if Option.isNone x then None,[]
+    else
+        let start,stop = Option.get x
+        let sourceRange = source, source + range - 1L
+        let below,translatable,above = splitRange (start,stop) sourceRange
+        let translator x = destination + (x - source)
+        let translated = Option.map (fun (a,b) -> translator a, translator b) translatable
+        translated,[below;above]
+
+
+
+
+let folder map (translated:(int64*int64) option list,rest:(int64*int64) option list) x =
+    let translated', rest' = translateRange' map x
+    translated'::translated,rest'@rest
+    
+let rec translateRange map (translatedRanges:(int64*int64) option list) (rest:(int64*int64) option list) =
+    match map with
+        | [] -> translatedRanges @ rest
+        | m::xs ->            
+           let translated,untranslated = List.fold (folder m) ([],[]) rest
+           translateRange xs (translated@translatedRanges) (untranslated)
+
+let rangeMap =
+    genMaps data
+    |> List.map (fun x -> translateRange x [])
+    |> List.reduce (>>)
+
+
+rangeMap seedsAsRanges
+|> List.filter Option.isSome
+|> List.map Option.get
+|> List.minBy fst
+|> fst
 |> printfn "Part 2: %A"
