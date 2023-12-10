@@ -59,14 +59,9 @@ let readFile file =
     |> (fun m -> Map.map (fun k v -> fst v,List.filter (fun x -> Map.containsKey x m) (snd v)) m)
     |> fixStart
 
-// let data = readFile "test.txt"
-// let data = readFile "test2.txt"
 let data = readFile "input.txt"
 
-
-
 let step' map from =
-    // Map.find from map |> snd
     let (_,next') = Map.find from map
     let next = List.filter ((<>) from) next'
     next
@@ -75,42 +70,117 @@ let step = step' data
 
 
 let bfsVisit visited (next,count) =
-    match Map.tryFind next visited with
-        | None -> Map.add next count visited
-        | Some s ->
-            if count < s then Map.add next count visited
-            else visited
-
+    Map.add next count visited
     
 let rec bfs (map:Map<(int*int),(Direction * (int*int) list)>)  (queue:((int*int)*int) list) visited =
     match queue with
         | [] -> visited
         | (x,count)::xs ->
-            // printfn "Visiting %A" x
             if Map.containsKey x visited then
-                // printfn "Already visited %A" x
                 bfs map xs visited
             else
-                // printfn "First time visiting %A" x
                 let visited' = bfsVisit visited (x,count)
                 let next =
                     step x
                     |> List.map (fun x -> x,count+1)
-                // printfn "Next nodes: %A" next
                 bfs map (xs@next) visited'
-            
 
-
-let solve data =
+let findLoop data =
     let start = findStart data
     bfs data [(start,0)] Map.empty
+
+
+    
+let solve loop = 
+    loop
     |> Map.toList
     |> List.map snd
     |> List.max
 
 
-solve data
+let start = findStart data
+let start' = Map.find start data |> snd
+let loop = findLoop data
+
+
+solve loop
 |> printfn "Part 1: %d"
 
+
+// Part 2
+let readFile2 file =
+    File.ReadAllLines file
+    |> List.ofArray
+    |> List.map explode
+
+
+let data2 = readFile2 "input.txt"
+
+
+let fixStart' (data:char list list) start start' : char list list =
+    let f (i,j) (x,y) (z,w) =
+        match (i-x,j-y),(i-z,j-w) with
+            | (0,1),(0,-1) -> '|'
+            | (0,-1),(0,1) -> '|'
+            | (-1,0),(1,0) -> '-'
+            | (1,0),(-1,0) -> '-'
+            | (0,-1),(1,0) -> 'L'
+            | (1,0),(0,-1) -> 'L'
+            | (1,0),(0,1) -> 'F'
+            | (0,1),(1,0) -> 'F'
+            | (-1,0),(0,-1) -> 'J'
+            | (0,-1),(-1,0) -> 'J'
+            | (-1,0),(0,1) -> '7'
+            | (0,1),(-1,0) -> '7'
+            | _ -> failwith <| sprintf "unexpected pair: xy: %A, zw: %A" (x,y) (z,w)
+    List.mapi (fun i x ->
+               List.mapi (fun j y ->
+                          if (i,j) <> start then y
+                          else f (i,j) (fst start') (snd start')
+                          ) x) data
+
+
+let x : char list list = fixStart' data2 start (List.head start', (List.tail >> List.head) start')
+
+let data2' = List.mapi (fun i x ->
+           List.mapi (fun j y -> if Map.containsKey (i,j) loop then Some y else None) x) x
+
+
+let rec filterPipes xs =
+    match xs with
+        | [] -> []
+        | Some 'L'::Some 'J'::xs -> filterPipes xs
+        | Some 'F'::Some '7'::xs -> filterPipes xs
+        | Some 'F'::Some 'J'::xs -> Some 'J' :: filterPipes xs
+        | Some 'L'::Some '7'::xs -> Some '7' :: filterPipes xs
+        | x::xs -> x::filterPipes xs
+
+let filterLine xs =
+    List.filter ((<>) (Some '-')) xs
+    |> filterPipes
+
+
+type Field =
+    | Pipe
+    | Outside
+    | Inside
+
+let rec findFields xs =
+    match xs with
+        | [] -> []
+        | Some x::xs -> Pipe:: findFields xs
+        | None::xs ->
+            let len = filterLine xs |> List.filter Option.isSome |> List.length
+            let result =
+                if len % 2 = 0 then Outside else Inside
+            result::findFields xs
+
+
+
+List.map findFields data2'
+|> List.concat
+|> List.filter ((=) Inside)
+|> List.length
+|> printfn "Part 2: %d"
 
 
