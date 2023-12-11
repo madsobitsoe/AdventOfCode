@@ -8,12 +8,12 @@ let readFile file =
     |> (fun x -> Array.head x, (Array.skip 1 >> Array.head) x)
 
 
-
 let rec toPairs xs =
     match xs with
     | [x]::[y;z]::[] -> [(x,(y,z))]
     | [x]::[y;z]::xs -> (x,(y,z))::toPairs xs
-    | [] -> failwith "oh heavens no"
+    | _ -> failwith "oh heavens no"
+    
 
 let parseMap (map:string) =
     map.Split "\n"
@@ -30,7 +30,6 @@ let parseMap (map:string) =
     |> toPairs
 
 
-
 let instructions,map =
     readFile "input.txt"    
     |> (fun (i,m) -> explode i, parseMap m)
@@ -42,6 +41,7 @@ let rec findNext dest inst xs =
             match inst with
                 | 'R' -> r
                 | 'L' -> l
+                | _ -> failwith <| sprintf "Bad instruction: %A" inst
         | _::xs -> findNext dest inst xs
         | [] -> failwith "oh oh"
 
@@ -62,7 +62,6 @@ findDest map instructions "AAA" "ZZZ" 0 instructions
 |> printfn "Part 1: %d"
 
 
-
 // Part 2 wtf
 let inst,m =
     readFile "input.txt"
@@ -75,24 +74,46 @@ let findStarts map =
     |> List.map (List.map string)
     |> List.map (List.reduce (+))
 
+let endsInLetter c =
+    explode >>
+    List.skip 2
+    >> List.head
+    >> (=) c
 
-let allEndsInZ coords =
-    List.map explode coords
-    |> List.map (List.skip 2 >> List.head)
-    |> List.forall (fun x -> x = 'Z')
-    
-let rec findDest2 map instructions start steps nextInstructions =
-    if allEndsInZ start then steps
-    // if start = stop then steps
-    else
-        // printfn "Checking: %A" start
-        let inst = List.head nextInstructions
-        let start' = List.map (fun x -> findNext x inst map) start
-        let next' =
-            match List.tail nextInstructions with
+let endsInZ = endsInLetter 'Z'
+
+let fn m k i =
+    let find = match i with | 'L' -> fst | 'R' -> snd | _ -> failwith "wrong inst"
+    Map.find k m |> find 
+
+let rec findDest3 findNext instructions start steps nextInstructions =
+    let inst = List.head nextInstructions
+    let start' = findNext start inst
+    let next' =
+        match List.tail nextInstructions with
             | [] -> instructions
             | xs -> xs
-        findDest2 map instructions start' (steps + 1L) next'
+    if endsInZ start' then start',(steps + 1L)
+    else findDest3 findNext instructions start' (steps + 1L) next'
 
-findDest2 m inst (findStarts m) 0L inst
-|> printfn "Part 2: %d"
+
+let rec getInstructions inst n =
+    let len = List.length inst
+    if n < len then List.skip n inst
+    else getInstructions inst (n-len)
+
+let rec gcd a b =
+    match b with
+        | 0L -> a
+        | _ -> gcd b (a % b)
+
+let lcm (a:int64) b = a * b / gcd a b
+
+let m' = Map m
+let starts = findStarts m
+
+
+List.map (fun x -> findDest3 (fn m') inst x 0L inst) starts
+|> List.map snd
+|> List.foldBack lcm <| 1L
+|> printfn "Part 2: %A"
