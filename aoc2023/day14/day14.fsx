@@ -102,38 +102,39 @@ List.transpose data
 |> printfn "Part 1: %A"
 
 
-let sameInterval xs =
-    let xs' = List.tail xs
-    if List.isEmpty xs' then false
+let rec detectCycle skip n data =
+    if skip = 0 then printfn "Looking for cycle of size %d" n
+    let xs = List.skip skip data
+    if skip = n-1 then None
+    else if List.length xs < n*n*4 then None
     else
-        xs'
-        |> List.pairwise
-        |> List.map (fun (a,b) -> a - b)
-        |> List.pairwise
-        |> List.forall (fun (a,b) -> a - b = 0L)
+    match xs with
+        | [] -> None
+        | _ ->
+            let h = List.take n xs
+            let h' = List.map snd h
+            let t =
+                List.fold (fun (acc,cs) _ -> (List.take n cs)::acc, List.skip n cs) ([],xs) [1..n*4]
+                |> fst
+                |> List.map (List.map snd)
+            if List.forall ((=) h') t then
+                printfn "Found cycle:\n%A" h
+                Some h
+            else
+                match detectCycle (skip + 1) n data with
+                    | None -> detectCycle 0 (n+1) data
+                    | x -> x
 
-let findInterval (xs:int64 list) =
-    xs
-    |> List.pairwise
-    |> List.map (fun (a,b) -> b - a)
-    |> List.head
-
-let findCycle xs =
-    let x = List.head xs
-    let start = snd x |> List.head |> fst
-    let stop = snd x |> List.skip 1 |> List.head |> fst
-    int64 start, int64 stop
 
 
-let sample = repeat 50000L 0L data [] |> List.mapi (fun i x -> i+1,x)
+let sample = repeat 1000000L 0L data [] |> List.mapi (fun i x -> i+1,x)
 
-List.groupBy snd sample
-|> List.sortByDescending (fun (a,b) -> List.length b)
-|> List.filter (fun (load, x) -> sameInterval (List.map (fst >> int64) x))
-|> List.sortByDescending (fun (load, x) -> findInterval (List.map (fst >> int64) x))
-|> findCycle
-|> (fun (start,stop) -> 1000000000L % (stop - start))
-|> (fun i -> List.item ((int i) - 1) sample)
-|> snd
+sample
+|> detectCycle 0 450
+|> (fun x -> Option.get x)
+|> (fun x -> List.head x |> fst |> int64, List.last x |> fst |> int64)
+|> (fun (start,stop) -> printfn "start:%A, stop: %A" start stop; ((1000000000L) % (stop - start + 1L)) + start)
+|> (fun i -> printfn "%d" i; List.item ((int i)-1) sample, List.item ((int i)) sample, List.item ((int i) + 1) sample)
+// |> snd
 |> printfn "Part 2: %A"
 
