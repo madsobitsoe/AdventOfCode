@@ -19,7 +19,6 @@ let memoize f =
                 res
     g
 
-
 let memoizeSingle f =
     let d = new System.Collections.Generic.Dictionary<_,_>()
     let rec g x =
@@ -30,8 +29,6 @@ let memoizeSingle f =
                 d.Add(x, res)
                 res
     g
-
-
 
 let readFile file =
     File.ReadAllLines file
@@ -106,7 +103,7 @@ let rec detectCycle skip n data =
     if skip = 0 then printfn "Looking for cycle of size %d" n
     let xs = List.skip skip data
     if skip = n-1 then None
-    else if List.length xs < n*n*4 then None
+    else if List.length xs < n*n then None
     else
     match xs with
         | [] -> None
@@ -114,7 +111,7 @@ let rec detectCycle skip n data =
             let h = List.take n xs
             let h' = List.map snd h
             let t =
-                List.fold (fun (acc,cs) _ -> (List.take n cs)::acc, List.skip n cs) ([],xs) [1..n*4]
+                List.fold (fun (acc,cs) _ -> (List.take n cs)::acc, List.skip n cs) ([],xs) [1..n]
                 |> fst
                 |> List.map (List.map snd)
             if List.forall ((=) h') t then
@@ -126,15 +123,14 @@ let rec detectCycle skip n data =
                     | x -> x
 
 
-
-let sample = repeat 1000000L 0L data [] |> List.mapi (fun i x -> i+1,x)
+let sample = repeat 25000L 0L data [] |> List.mapi (fun i x -> i+1,x)
 
 sample
-|> detectCycle 0 450
+|> detectCycle 0 153
 |> (fun x -> Option.get x)
 |> (fun x -> List.head x |> fst |> int64, List.last x |> fst |> int64)
-|> (fun (start,stop) -> printfn "start:%A, stop: %A" start stop; ((1000000000L) % (stop - start + 1L)) + start)
-|> (fun i -> printfn "%d" i; List.item ((int i)-1) sample, List.item ((int i)) sample, List.item ((int i) + 1) sample)
-// |> snd
+|> (fun (start,stop) -> printfn "start:%A, stop: %A" start stop; ((1000000000L) % stop + stop ))
+|> (fun i -> List.item (int i) sample)
+|> snd
 |> printfn "Part 2: %A"
 
