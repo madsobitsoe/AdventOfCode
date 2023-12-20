@@ -30,13 +30,13 @@ let readFile file =
 
 
 
-let sendPulse (p:Pulse) (source:string) (destination:string) (config:Configuration) =
-    match Map.tryFind destination config with
-        | None -> failwith <| sprintf "Destination module not found!\nPulse: %A\nSource: %s\nDestination: %s" p source destination
-        | Some m ->
-            printfn "Sending %A pulse from %s to %s" p source destination
+// let sendPulse (p:Pulse) (source:string) (destination:string) (config:Configuration) =
+//     match Map.tryFind destination config with
+//         | None -> failwith <| sprintf "Destination module not found!\nPulse: %A\nSource: %s\nDestination: %s" p source destination
+//         | Some m ->
+//             printfn "Sending %A pulse from %s to %s" p source destination
     
-    config
+//     config
 
 let receivePulse (p:Pulse) (source:string) (destination:string) (config:Configuration) =
     match Map.tryFind destination config with
@@ -61,7 +61,7 @@ let receivePulse (p:Pulse) (source:string) (destination:string) (config:Configur
 
 let rec sendReceive (config:Configuration) lowSent highSent acc toSend =
     printfn "toSend: %A" toSend
-    printfn "acc: %A" acc
+    // printfn "acc: %A" acc
     match toSend with
         | [] ->
             match acc with
@@ -86,11 +86,36 @@ let rec pushButton times sent (config:Configuration) =
 
 
 
-// let data = readFile "test.txt"
+//let data = readFile "test.txt"
 let data = readFile "test2.txt"
 // let data = readFile "input.txt"
 let config = Map.ofList data
+// Find names of all Conjunction modules
+let cons = Map.filter (fun k v -> match v with | Conjunction _ -> true | _ -> false) config |> Map.toList |> List.map fst
 // Find all modules that sends to a Conjunction module
+let consSends map name =
+    let matchF _ v =
+        match v with
+            | Broadcaster dests -> List.contains name dests
+            | FlipFlop (_,dests) -> List.contains name dests
+            | Conjunction (_,dests) -> List.contains name dests
+            | Generic _ -> false
+    Map.filter matchF map
+    |> Map.toList
+    |> List.map fst
+    |> (fun x -> name,x)
+
+let updateMap map ((k:string),v) =
+    let (Conjunction (ins,outs)) = Map.find k map
+    let newIns = List.map (fun x -> x,Low) v |> Map.ofList
+    Map.add k (Conjunction (newIns,outs)) map
+
 // Then update the maps of all Conjunction modules
 
-pushButton 1000 (0L,0L) config
+let config' =
+    List.map (consSends config) cons
+    |> List.fold (fun acc x -> updateMap acc x) config
+
+pushButton 1000 (0L,0L) config'
+
+pushButton 1 (0L,0L) config'
