@@ -38,28 +38,28 @@ let readFile file =
     
 //     config
 
-let receivePulse (p:Pulse) (source:string) (destination:string) (config:Configuration) =
+let receivePulse (p:Pulse) (source:string) (destination:string) (config:Configuration) (updatedConfig:Configuration) =
     match Map.tryFind destination config with
         | None ->
-            config,[]
+            updatedConfig,[]
             // failwith <| sprintf "Destination module not found!\nPulse: %A\nSource: %s\nDestination: %s" p source destination
         | Some m ->
             match m with
-                | Broadcaster dests -> config, List.map (fun x -> p,destination,x) dests
+                | Broadcaster dests -> updatedConfig, List.map (fun x -> p,destination,x) dests
                 | FlipFlop (state,dests) ->
-                    if p = High then config,[]
+                    if p = High then updatedConfig,[]
                     else
-                        let config' = Map.add destination (FlipFlop ((not state),dests)) config
+                        let config' = Map.add destination (FlipFlop ((not state),dests)) updatedConfig
                         let p' = if state then Low else High
                         config', List.map (fun x -> p',destination,x) dests
                 | Conjunction (map, dests) ->
                     let map' = Map.add source p map
                     let p' = if Map.forall (fun k v -> v = High) map' then Low else High
-                    config, List.map (fun x -> p',destination,x) dests
-                | _ -> config,[]
+                    updatedConfig, List.map (fun x -> p',destination,x) dests
+                | _ -> updatedConfig,[]
 
 
-let rec sendReceive (config:Configuration) lowSent highSent acc toSend =
+let rec sendReceive (config:Configuration) (updatedConfig:Configuration) lowSent highSent acc toSend =
     printfn "toSend: %A" toSend
     // printfn "acc: %A" acc
     match toSend with
@@ -67,13 +67,13 @@ let rec sendReceive (config:Configuration) lowSent highSent acc toSend =
             match acc with
                 | [] ->
                     printfn "lowSent: %A, highSent: %A" lowSent highSent 
-                    lowSent,highSent,config
-                | acc -> sendReceive config lowSent highSent [] acc
+                    lowSent,highSent,updatedConfig
+                | acc -> sendReceive updatedConfig updatedConfig lowSent highSent [] acc
         | x::xs ->
             let (p,s,d) = x
-            let config',newSends = receivePulse p s d config
+            let config',newSends = receivePulse p s d config updatedConfig
             let ls,hs = if p = High then lowSent,highSent+1L else lowSent+1L,highSent
-            sendReceive config' ls hs (acc@newSends) xs
+            sendReceive config config' ls hs (acc@newSends) xs
             
 
 let rec pushButton times sent (config:Configuration) =
@@ -81,7 +81,7 @@ let rec pushButton times sent (config:Configuration) =
         | 0 -> sent,config
         | n ->
             let ls,hs = sent
-            let ls',hs',config' = sendReceive config 0L 0L [] [Low,"Button","broadcaster"]
+            let ls',hs',config' = sendReceive config config 0L 0L [] [Low,"Button","broadcaster"]
             pushButton (times-1) (ls+ls',hs+hs') config'
 
 
@@ -116,6 +116,6 @@ let config' =
     List.map (consSends config) cons
     |> List.fold (fun acc x -> updateMap acc x) config
 
-pushButton 1000 (0L,0L) config'
+// pushButton 1000 (0L,0L) config'
 
 pushButton 1 (0L,0L) config'
