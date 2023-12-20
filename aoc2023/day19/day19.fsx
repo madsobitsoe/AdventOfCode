@@ -67,7 +67,7 @@ let parseRule (r:string) =
     name,workFlow subRules
 
 
-//let rules',items' = readFile "test.txt"
+// let rules',items' = readFile "test.txt"
 let rules',items' = readFile "input.txt"
 let rules = List.map parseRule rules' |> Map.ofList
 let items = List.map parseItem items'
@@ -115,8 +115,8 @@ let splitInterval cmp (l,h) at =
         | _ -> failwith <| sprintf "Unexpected cmp: %A" cmp
 
 
-splitInterval '<' (1L,4000L) 1351L
-splitInterval '>' (1L,4000L) 1351L
+// splitInterval '<' (1L,4000L) 1351L
+// splitInterval '>' (1L,4000L) 1351L
 
 let getIdx' idx (r:IItem) =
     match idx with
@@ -204,7 +204,7 @@ let rec applyRules rulesMap acc rules =
     match rules with
         | [] -> acc
         | rules ->
-            let res = List.collect (applyRule' rulesMap) rules
+            let res = List.collect (applyRule' rulesMap) rules |> List.distinct
             let resDone,resToDo = List.partition (fun (n,_) -> n = "A" || n = "R") res
             printfn "resToDO: \n%A" resToDo
             printfn "resDone:\n%A" resDone
@@ -212,37 +212,44 @@ let rec applyRules rulesMap acc rules =
     
 
 
-let joinIntervals (l1,h1) (l2,h2) =
-    if h1+1L=l2 || h2+1L=l1 then [(min l1 l2, max h1 h2)]
-    else if h1 < l2 || h2 < l1 then [(l1,h1);(l2,h2)]
+// let joinIntervals (l1,h1) (l2,h2) =
+//     if h1+1L=l2 || h2+1L=l1 then [(min l1 l2, max h1 h2)]
+//     else if h1 < l2 || h2 < l1 then [(l1,h1);(l2,h2)]
     
-    else [min l1 l2, max h1 h2]
+//     else [min l1 l2, max h1 h2]
 
 
-let joinItems' ((i1:IItem), (i2:IItem)) =
-    let x = joinIntervals i1.x i2.x
-    let m = joinIntervals i1.m i2.m
-    let a = joinIntervals i1.a i2.a
-    let s = joinIntervals i1.s i2.s
-    x,m,a,s
+// let joinItems' ((i1:IItem), (i2:IItem)) =
+//     let x = joinIntervals i1.x i2.x
+//     let m = joinIntervals i1.m i2.m
+//     let a = joinIntervals i1.a i2.a
+//     let s = joinIntervals i1.s i2.s
+//     x,m,a,s
 
 
+// type ILItem = { x:(int64*int64) list; m:(int64*int64) list; a:(int64*int64) list; s:(int64*int64) list;}
+// let defaultILItem = { x = []; m = []; a = []; s = []; }    
+
+// let buildILItem (acc:ILItem) (i:IItem) =
+//     { acc with x = i.x::acc.x; m = i.m::acc.m; a = i.a::acc.a; s = i.s::acc.s; }
 
 
-
-
-let buildILItem (acc:ILItem) (i:IItem) =
-    { acc with x = i.x::acc.x; m = i.m::acc.m; a = i.a::acc.a; s = i.s::acc.s; }
-
-type ILItem = { x:(int64*int64) list; m:(int64*int64) list; a:(int64*int64) list; s:(int64*int64) list;}
-let defaultILItem = { x = []; m = []; a = []; s = []; }    
+let sumIItem (x:IItem) =
+    let x' = snd x.x - fst x.x + 1L
+    let m' = snd x.m - fst x.m + 1L
+    let a' = snd x.a - fst x.a + 1L
+    let s' = snd x.s - fst x.s + 1L
+    x' * m' * a' * s'
 
 applyRules rulesp2 [] [("in", Some defaultIItem)]
-|> List.filter (fst >> (=) "R")
+|> List.filter (fst >> (=) "A")
+|> (fun x -> printfn "%A" x; x)
 |> List.map snd
 |> List.filter Option.isSome
 |> List.map Option.get
-|> List.fold buildILItem defaultILItem
+|> List.map sumIItem
+|> List.sum
+|> printfn "Part 2: %A"
 
 
 
