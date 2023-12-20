@@ -105,3 +105,10 @@ pushButton 1000 (0L,0L) config'
 |> (fun (a,b) -> a * b)
 |> printfn "part 1: %A"
 
+
+
+// Part 2
+let rxInput =
+    consSends config' "rx"
+    |> snd |> List.head
+
