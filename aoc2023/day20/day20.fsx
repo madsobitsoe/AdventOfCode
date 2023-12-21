@@ -27,7 +27,7 @@ let readFile file =
     |> List.map parseModule
 
 let receivePulse (p:Pulse) (source:string) (destination:string) (config:Configuration) (updatedConfig:Configuration) =
-    printfn "%s -%A- %s" source p destination
+    // printfn "%s -%A- %s" source p destination
     match Map.tryFind destination config with
         | None -> updatedConfig,[]
         | Some m ->
@@ -108,7 +108,13 @@ pushButton 1000 (0L,0L) config'
 
 
 // Part 2
+
+// Looking for when these modules will send a High pulse
 let rxInput =
     consSends config' "rx"
     |> snd |> List.head
+    |> consSends config'
+    |> snd
+
+
 
