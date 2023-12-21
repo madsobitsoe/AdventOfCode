@@ -27,6 +27,15 @@ let readFile file =
     |> List.map parseModule
 
 let receivePulse (p:Pulse) (source:string) (destination:string) (config:Configuration) (updatedConfig:Configuration) =
+    match p with
+        | Low -> ()
+        | High ->
+            match destination with
+                | "sq" ->
+                    match source with
+                        | "fv" | "kk" | "vt" | "xr" -> printfn "%s hit!" source
+                        | _ -> ()
+                | _ -> ()
     // printfn "%s -%A- %s" source p destination
     match Map.tryFind destination config with
         | None -> updatedConfig,[]
@@ -65,6 +74,7 @@ let rec pushButton times sent (config:Configuration) =
             let ls,hs = sent
             let ls',hs',config' = sendReceive config config 0L 0L [] [Low,"Button","broadcaster"]
             pushButton (times-1) (ls+ls',hs+hs') config'
+
 
 
 
@@ -117,4 +127,19 @@ let rxInput =
     |> snd
 
 
+let rec pushButton' (n:int64) (times:int64) sent (config:Configuration) =
+    if n = times then sent,config
+    else
+        printfn "Pushed button %d times" n
+        let ls,hs = sent
+        let ls',hs',config' = sendReceive config config 0L 0L [] [Low,"Button","broadcaster"]
+        pushButton' (n+1L) times (ls+ls',hs+hs') config'
 
+pushButton' 0L 4000L (0L,0L) config'
+
+let xr = 3769L
+let vt = 3797L
+let fv = 3863L
+let kk = 3931L
+
+xr * vt * fv * kk
