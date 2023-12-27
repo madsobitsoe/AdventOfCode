@@ -8,24 +8,85 @@ let readFile file =
     |> List.map (fun (dir,count,color) -> dir, int count, color)
 
 
-    
-let data = readFile "test.txt"
-//let data = readFile "test2.txt"
-//let data = readFile "input.txt"
+//let data = readFile "test.txt"
+let data = readFile "input.txt"
 
-
-
-
-let step dir last =
+let step dir n last =
     let x,y = last
     match dir with
-    | "R" -> x,y+1
-    | "L" -> x,y-1
-    | "U" -> x-1,y
-    | "D" -> x+1,y
+    | "R" -> x,y+n
+    | "L" -> x,y-n
+    | "U" -> x-n,y
+    | "D" -> x+n,y
     | _ -> failwith <| sprintf "Unexpected dir: %A" dir
 
-let step' dir n last =
+
+let rec toMap lastPos instructions map =
+    match instructions with
+        | [] -> map
+        | (dir,n,color)::xs ->
+            let next = step dir n lastPos
+            toMap next xs ((lastPos,color)::map)
+
+
+let data' = toMap (0,0) data []
+
+let minRow = List.minBy (fst >> fst) data' |> fst |> fst
+let minCol = List.minBy (fst >> snd) data' |> fst |> snd
+
+let mapper data = List.map (fun ((x,y),color) -> (x + abs minRow, y + abs minCol),color) data
+let data'' = mapper data'
+let maxRow = List.maxBy (fst >> fst) data'' |> fst |> fst
+let maxCol = List.maxBy (fst >> snd) data'' |> fst |> snd
+
+let mapData = Map.ofList data''
+
+
+let shoeLacePart ((x0:float,y0),(x1,y1)) = x0 * y1 - y0 * x1
+
+let shoelaceData =
+    let last = List.head data''
+    data'' @ [last]
+
+
+let shoelaceCount =
+    shoelaceData
+    |> List.map fst
+    |> List.map (fun (a,b) -> float a, float b)
+    |> List.pairwise
+    |> List.map shoeLacePart
+    |> List.sum
+    |> float
+    |> (*) 0.5
+
+
+let boundaryCount =
+    shoelaceData
+    |> List.map fst
+    |> List.pairwise
+    |> List.fold (fun acc ((x0,y0),(x1,y1)) -> acc + (abs (x0-x1)) + (abs (y0-y1))) 0
+    |> (fun x -> x / 2 + 1)
+
+
+shoelaceCount
+|> int
+|> (+) boundaryCount
+|> printfn "Part 1: %d"
+
+
+// Part 2
+
+let hexToInt64 s = System.Convert.ToInt64(s, 16)
+
+let colorToInstruction (s:string) =
+    let num = Seq.skip 2 s |> Seq.take 5 |> Seq.map string |> Seq.reduce (+) |> hexToInt64
+    let dir =
+        Seq.skip 7 s |> Seq.head
+        |> (fun c -> match c with | '0' -> "R" | '1' -> "D" | '2' -> "L" | '3' -> "U" | _ -> failwith <| sprintf "unexpected digit: %A" c)
+    dir,num,s
+    
+
+let step' (dir:string) (n:int64) (last:int64*int64) =
     let x,y = last
     match dir with
     | "R" -> x,y+n
@@ -36,89 +97,54 @@ let step' dir n last =
 
 
 
-let rec toMap lastPos instructions map =
-    match instructions with
-        | [] -> map |> List.rev
-        | (_, 0, _)::xs -> toMap lastPos xs map
-        | (dir,n,color)::xs ->
-            let next = step dir lastPos
-            toMap next ((dir,n-1,color)::xs) ((lastPos,color)::map)
-
 let rec toMap' lastPos instructions map =
     match instructions with
-        | [] -> map // |> List.rev
-        // | (_, 0, _)::xs -> toMap lastPos xs map
+        | [] -> map
         | (dir,n,color)::xs ->
+            let dir,n,color = colorToInstruction color
             let next = step' dir n lastPos
             toMap' next xs ((lastPos,color)::map)
 
 
-// let data' = toMap (0,0) data []
 
-// let minRow = List.minBy (fst >> fst) data' |> fst |> fst
-// let minCol = List.minBy (fst >> snd) data' |> fst |> snd
+let p2data' = toMap' (0L,0L) data []
 
-// let mapper data = List.map (fun ((x,y),color) -> (x + abs minRow, y + abs minCol),color) data
-// let data'' = mapper data'
-// let maxRow = List.maxBy (fst >> fst) data'' |> fst |> fst
-// let maxCol = List.maxBy (fst >> snd) data'' |> fst |> snd
+let p2minRow = List.minBy (fst >> fst) p2data' |> fst |> fst
+let p2minCol = List.minBy (fst >> snd) p2data' |> fst |> snd
 
-// let mapData = Map.ofList data''
+let p2mapper data = List.map (fun ((x,y),color) -> (x + abs p2minRow, y + abs p2minCol),color) data
+let p2data'' = p2mapper p2data'
+let p2maxRow = List.maxBy (fst >> fst) p2data'' |> fst |> fst
+let p2maxCol = List.maxBy (fst >> snd) p2data'' |> fst |> snd
 
-let data' = toMap' (0,0) data []
+let p2mapData = Map.ofList p2data''
 
-let minRow = List.minBy (fst >> fst) data' |> fst |> fst
-let minCol = List.minBy (fst >> snd) data' |> fst |> snd
-
-let mapper data = List.map (fun ((x,y),color) -> (x + abs minRow, y + abs minCol),color) data
-let data'' = mapper data'
-let maxRow = List.maxBy (fst >> fst) data'' |> fst |> fst
-let maxCol = List.maxBy (fst >> snd) data'' |> fst |> snd
-
-// data'' |> List.rev
-
-let mapData = Map.ofList data''
+let p2shoelaceData =
+    let last = List.head p2data''
+    p2data'' @ [last]
 
 
-let shoeLacePart ((x0:float,y0),(x1,y1)) = x0 * y1 - y0 * x1
+let p2shoelaceCount =
+    p2shoelaceData
+    |> List.map fst
+    |> List.map (fun (a,b) -> float a, float b)
+    |> List.pairwise
+    |> List.map shoeLacePart
+    |> List.sum
+    |> float
+    |> (*) 0.5
 
 
-let d = [2,1; 5,0; 6,4; 4,2; 1,3; 2,1]
-
-let shoelaceData =
-    let last = List.head data''
-    data'' @ [last]
-
-//data''
-shoelaceData
-|> List.map fst
-|> List.map (fun (a,b) -> float a, float b)
-|> List.pairwise
-|> List.map shoeLacePart
-|> List.sum
-|> float
-|> (*) 0.5
-// |> (+) (List.length data'' |> float)
-|> printfn "shoelace: %A"
+let p2boundaryCount =
+    p2shoelaceData
+    |> List.map fst
+    |> List.map (fun (a,b) -> int64 a, int64 b)
+    |> List.pairwise
+    |> List.fold (fun acc ((x0,y0),(x1,y1)) -> acc + (abs (x0-x1)) + (abs (y0-y1))) 0L
+    |> (fun x -> x / 2L + 1L)
 
 
-
-
-
-let p (xs: int list list) =
-    printfn ""
-    List.iter (fun x -> List.iter (fun x -> let x' = if x = 1 then "#" else "." in printf "%s" x') x; printfn "") xs
-    xs
-
-List.mapi (fun i x -> List.mapi (fun j y -> match Map.tryFind (i,j) mapData with | None -> 0 | Some _ -> 1) [0..maxCol]) [0..maxRow]
-|> p
-// |> List.map fillOutside
-// |> p
-|> List.map List.sum
-|> List.sum
-|> printfn "Part 1: %d"
-
-// List.mapi (fun i x -> List.mapi (fun j y -> match Map.tryFind (i,j) mapData with | None -> isInside mapData i j | Some _ -> 1) [0..maxCol]) [0..maxRow]
-// |> List.map List.sum
-// |> List.sum
-// |> printfn "Part 1: %d"
+p2shoelaceCount
+|> int64
+|> (+) p2boundaryCount
+|> printfn "Part 2: %d"
