@@ -6,7 +6,8 @@ let readFile file =
     |> Array.map (fun arr -> arr.[0], arr.[1].Split " " |> List.ofArray)
     |> List.ofArray
 
-let data = readFile "test.txt"
+//let data = readFile "test.txt"
+let data = readFile "input.txt"
 
 
 let toMap'' map (h:string,t:string) =
@@ -25,75 +26,48 @@ let toMap' map (h:string, t:string list) =
     List.fold (fun acc x -> toMap'' acc (h,x)) map t
 
 let toMap = List.fold toMap' Map.empty
-
 let data' = toMap data
-
-let merge (s:string) t map =
-    let st = s + t
-    let sEdges = Map.find s map |> Set.toList
-    let tEdges = Map.find t map |> Set.toList
-    let allEdges = sEdges@tEdges
-    let uniqueEdges = List.map fst allEdges |> set
-    let map' = Map.remove s map |> Map.remove t
-    let newWeights =
-        List.groupBy fst allEdges
-        |> List.map (fun (n,c) -> n, List.map snd c)
-        |> List.map (fun (n,(c:int64 list)) -> n, List.sum c)
-        |> set
-    let nw' = Set.toList newWeights |> Map
-    let map'' = Map.add st newWeights map'
-    Map.map (fun k v -> if Set.contains k uniqueEdges then Set.map (fun x -> if fst x = s || fst x = t then (st,Map.find k nw') else x) v else v) map''
-    
-
-let connections (name:string, edges : Set<string*int64>) = Set.toList edges |> List.map snd |> List.sum
 
 let connectionsIn map (name:string, edges:Set<string*int64>) =
     Set.toList edges
     |> List.filter (fun (k,v) -> Map.containsKey k map)
-    |> List.map snd
-    |> List.sum
-    
+    |> List.length
 
-let rec minCutPhase' map map' =
-    if Map.count map - 2 <= (Map.count map') then
-        let toMerge = Map.filter (fun k v -> not (Map.containsKey k map')) map |> Map.toList
-        let a = List.head toMerge |> fst
-        let b = (List.tail >> List.head) toMerge |> fst
-        merge a b map
+let findMostConnected mapS mapT =
+    Map.toSeq mapS
+    |> Seq.maxBy (connectionsIn mapT)
+
+let moveNode mapS mapT node =
+    let nodeName,edges = node
+    match Map.tryFind nodeName mapS with
+        | None -> mapS,mapT
+        | Some edges' ->
+            Map.remove nodeName mapS, Map.add nodeName edges' mapT
+
+let allConnectionsInOtherComponent (map:Map<string,Set<(string*int64)>>) =
+    Map.values map
+    |> Seq.map (Set.map fst)
+    |> Seq.fold (fun acc x -> acc + x) Set.empty
+    |> Seq.filter (fun x -> not (Map.containsKey x map))
+    |> Seq.length
+
+let isDone mapS mapT =
+    let mapSCons = allConnectionsInOtherComponent mapS
+    let mapTCons = allConnectionsInOtherComponent mapT
+    mapSCons = 3 && mapTCons = 3
+
+let rec findCut mapS mapT =
+    if Map.count mapS < 3 then
+        findCut mapT mapS
+    else if isDone mapS mapT then mapS,mapT
     else
-        printfn "yup"    
-        let l = Map.toList map |> List.filter (fun (k,v) -> not (Map.containsKey k map')) |> List.sortByDescending (connectionsIn map')
-        printfn "l: %A" l
-        let k,v = List.head l
-        Map.add k v map'
-        |> minCutPhase' map
+        let node = findMostConnected mapS mapT
+        let mapS',mapT' = moveNode mapS mapT node
+        findCut mapS' mapT'
 
 
-let minCutPhase map =
-    let l' = Map.toList map |> List.sortByDescending connections
-    let a = List.take 1 l' |> Map.ofList
-    let l = List.tail l'
-    minCutPhase' map a
+findCut data' Map.empty
+|> (fun (a,b) -> Map.count a * Map.count b)
+|> printfn "Part 1: %d"
 
 
-let rec minCut map =
-    if Map.count map > 2 then
-        let map' = minCutPhase map
-        minCut map'
-    else
-        map
-
-minCut data'
-    
-// merge "rzs" "frs" data'
-// |> merge "rzsfrs" "cmg"
-// |> merge "rzsfrscmg" "qnr"
-// |> merge "rzsfrscmgqnr" "pzl"
-// |> merge "rzsfrscmgqnrpzl" "nvd"
-// |> merge "rzsfrscmgqnrpzlnvd" "lsr"
-// |> merge "rzsfrscmgqnrpzlnvdlsr" "rsh"
-// |> merge "rzsfrscmgqnrpzlnvdlsrrsh" "hfx"
-// |> merge "rzsfrscmgqnrpzlnvdlsrrshhfx" "xhk"
-// |> merge "rzsfrscmgqnrpzlnvdlsrrshhfxxhk" "ntq"
-// |> merge "bvb" "jqt"
-// |> merge "bvbjqt" "lhk"
