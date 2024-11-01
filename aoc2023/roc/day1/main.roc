@@ -33,19 +33,10 @@ main =
         List.keepOks s part1
         |> List.sum
         |> Num.toStr
-    # sums = List.map s \e -> Str.split e "\n"
-    #   |> List.keepOks Str.toI32
-    #  |> List.sum
-    # max = List.max sums
 
     part2String =
         List.keepOks s part2
         |> List.sum
         |> Num.toStr
-    # top3 =
-    #    List.sortDesc sums
-    #    |> List.takeFirst 3
-    #    |> List.sum
-    #    |> Num.toStr
 
     Stdout.line! "Part 1: $(part1String)\nPart 2: $(part2String)"
