@@ -131,11 +131,18 @@ let compact2 arr =
                     match arr.[front] with
                         | Empty space ->
                             printfn "Front was empty, %A, empty space: %A" front space
-                            if space >= len then
+                            if space = len then
                                 arr.[front] <- File (len,i)
                                 arr.[back] <- Empty space
                                 back <- back - 1
                                 notFinished <- false
+                            else if space > len then
+                                let newEmpty = Empty (space - len)
+                                arr.[front] <- File (len,i)
+                                arr.[back] <- Empty space
+                                for i = back downto front + 1 do
+                                    arr.[i] <- arr.[i-1]
+                                arr.[front+1] <- newEmpty
                             else
                                 front <- front + 1
                         | File _ ->
@@ -148,7 +155,71 @@ let compact2 arr =
 
 let blockMap =
     toBlockMap data [] true 0
-    |> List.toArray
+    // |> List.toArray
 
 let compacted = compact2 blockMap
 
+checkSum compacted
+
+
+
+let rec consolidate acc xs =
+    match xs with
+        | [] -> List.rev acc
+        | Empty s1::Empty s2::xs ->
+            consolidate  (Empty (s1+s2)::acc) xs
+        | x::xs -> consolidate (x::acc) xs
+
+let canFit n x =
+    match x with
+        | File _ -> false
+        | Empty space -> space >= n
+
+let rec insert xs x =
+    match x with
+        | Empty _ -> xs //failwith <| sprintf "Entry was empty, can't insert"
+        | File (count,value) ->
+            printfn "Found file: %A" x
+            match List.tryFindIndex (canFit count) xs with
+                | None -> xs
+                | Some idx ->
+                    printfn "Fits at idx %A" idx
+                    match List.item idx xs with
+                        | File _ -> failwith <| sprintf "Found file, error"
+                        | Empty space ->
+                            let orgIdx = List.findIndexBack ((=) x) xs
+                            if space = count then
+                                printfn "Inserting %A at %A" x idx
+                                List.updateAt idx x xs
+                                |> List.removeAt orgIdx
+                            else
+                                printfn "Inserting %A and Empty %A at %A" x (space - count) idx
+                                List.removeAt orgIdx xs
+                                |> List.removeAt idx 
+                                |> List.insertManyAt idx [x; Empty (space - count)]
+                                |> consolidate []
+
+            
+
+
+let part2 xs =
+    let acc = xs
+    let reversed = List.tail xs |> List.rev
+    List.fold insert xs reversed 
+
+
+
+let rec toArray acc xs =
+    match xs with
+        | [] -> List.rev acc |> List.toArray
+        | File (count,value)::xs ->
+            toArray  (List.replicate count (value |> Some) @ acc) xs
+        | Empty space::xs ->
+            toArray ((List.replicate space None) @ acc) xs
+
+
+let res =
+    part2 blockMap
+    |> toArray []
+    // |> (fun x -> printfn "%A" x; x)
+    // |> checkSum
