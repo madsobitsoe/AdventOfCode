@@ -15,14 +15,14 @@ let data = readFile "input.txt"
 
 let rec toFileMap (xs:char list) (acc) isFileData idx =
     match xs with
-    | [] -> acc
+    | [] -> acc |> List.rev
     | x::xs ->
         let xi = (int x) - 48
         let ci = Some idx
         if isFileData then
-            toFileMap xs (acc @ List.replicate xi ci) false (idx+1)
+            toFileMap xs (List.replicate xi ci @ acc) false (idx+1)
         else
-            toFileMap xs (acc @ List.replicate xi None) true idx
+            toFileMap xs (List.replicate xi None @ acc) true idx
 
 let fileMap =
     toFileMap data [] true 0
