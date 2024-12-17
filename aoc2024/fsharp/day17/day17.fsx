@@ -1,14 +1,11 @@
 open System.IO
 open System.Text.RegularExpressions
 
-
-type CPU = { A: int; B: int; C: int; PC: int }
-
-
+type CPU = { A: int64; B: int64; C: int64; PC: int ; Output: int list }
 
 let (|Integer|_|) (str: string) =
-   let mutable intvalue = 0
-   if System.Int32.TryParse(str, &intvalue) then Some(intvalue)
+   let mutable intvalue = 0L
+   if System.Int64.TryParse(str, &intvalue) then Some(intvalue)
    else None
 
 let getInt = function
@@ -39,13 +36,11 @@ let getRegister = function
     | RegisterC c -> c
     | x -> failwith <| sprintf "Bad data: %A" x
 
-
 let parseCPU (s:string) =
     s.Split "\n"
     |> Array.filter ((<>) "")
     |> Array.map getRegister
-    |> (fun arr -> { A = arr.[0]; B = arr.[1]; C = arr.[2] ; PC = 0 })
-
+    |> (fun arr -> { A = arr.[0]; B = arr.[1]; C = arr.[2] ; PC = 0 ; Output = [] })
 
 let parseProgram (s:string) =
     s.Split ": "
@@ -59,104 +54,106 @@ let readFile file =
     File.ReadAllText file
     |> fun s -> s.Split "\n\n"
     |> (fun a -> parseCPU a.[0],parseProgram a.[1])
-    
-
-//let data = readFile "test.txt"
-let data = readFile "input.txt"
 
 let getComboOperand cpu operand =
     match operand with
-        | 4 -> cpu.A
-        | 5 -> cpu.B
-        | 6 -> cpu.C
-        | 7 -> failwith <| sprintf "Invalid combo operand: %A" operand
+        | 4L -> cpu.A
+        | 5L -> cpu.B
+        | 6L -> cpu.C
+        | 7L -> failwith <| sprintf "Invalid combo operand: %A" operand
         | _ -> operand
 
 let nextInstruction program cpu =
-//    printfn "cpu: %A" cpu
-    let opcode = Map.tryFind cpu.PC program
-    if Option.isNone opcode then
-        printfn "HALTING"
-        None
-    else
-    let operand =
-        match Map.tryFind (cpu.PC+1) program with
-            | None -> failwith <| sprintf "Found no operand at %A" (cpu.PC+1)
-            | Some op -> op
+    match Map.tryFind cpu.PC program, Map.tryFind (cpu.PC+1) program with
+        | None,_ -> false,cpu
+        | Some opcode, None -> failwith <| sprintf "Found no operand at %A" (cpu.PC + 1)
+        | Some opcode, Some operand ->
+            match opcode with
+                // adv - division
+                | 0L ->
+                    let operand' = getComboOperand cpu operand
+                    let shift = pown 2 (int operand')
+                    let res = cpu.A / (int64 shift)
+                    true, { cpu with A = res; PC = cpu.PC+2 }
+                // bxl - bitwise XOR of B and operand
+                | 1L ->
+                    let res = cpu.B ^^^ operand
+                    true, { cpu with B = res; PC = cpu.PC+2 }
+                // bst
+                | 2L ->
+                    let combo = getComboOperand cpu operand
+                    let res = combo % 8L
+                    true, { cpu with B = res; PC = cpu.PC + 2 }
+                // jnz
+                | 3L ->
+                    if cpu.A = 0L then
+                        true, { cpu with PC = cpu.PC + 2 }
+                    else
+                        true, { cpu with PC = int operand }
 
-    //printfn "Found opcode: %A and operand: A" opcode operand
-    match opcode with
-        None ->
-            printfn "HALTING"
-            None
-        // adv - division
-        | Some 0 ->
-            let operand' = getComboOperand cpu operand
-            let shift = pown 2 operand'            
-//            let shift =
-//                if (operand' - 1 = 0) then 1 else 2 <<< (operand' - 1)
-                //2 <<< (operand' - 1)
+                // bxc
+                | 4L ->
+                    let res = cpu.B ^^^ cpu.C
+                    true, { cpu with B = res; PC = cpu.PC + 2 }
 
-            let res = cpu.A / shift
-//            printfn "operand: %A, res: %A" operand' res
-            Some { cpu with A = res; PC = cpu.PC+2 }
-        // bxl - bitwise XOR of B and operand
-        | Some 1 ->
-            let res = cpu.B ^^^ operand
-            Some { cpu with B = res; PC = cpu.PC+2 }
-        // bst
-        | Some 2 ->
-            let combo = getComboOperand cpu operand
-            let res = combo % 8
-            Some { cpu with B = res; PC = cpu.PC + 2 }
-        // jnz
-        | Some 3 -> 
-            if cpu.A = 0 then
-                // printfn "Not jumping"
-                Some { cpu with PC = cpu.PC + 2 }
-            else
-                // printfn "Jumping to: %A" operand
-                Some { cpu with PC = operand }
-        
-        // bxc
-        | Some 4 ->
-            let res = cpu.B ^^^ cpu.C
-            Some { cpu with B = res; PC = cpu.PC + 2 }
-        
-        // out
-        | Some 5 ->
-            let combo = (getComboOperand cpu operand) % 8
-            printf "%d," combo
-            Some { cpu with PC = cpu.PC + 2 }
-        
-        // bdv
-        | Some 6 ->
-            let operand' = getComboOperand cpu operand
-            let shift = pown 2 operand'
-            //    if (operand' - 1 = 0) then 1 else 2 <<< (operand' - 1)                
-                //2 <<< (operand' - 1)
-            let res = cpu.A / shift
-            Some { cpu with B = res; PC = cpu.PC+2 }
-            
-        // cdv
-        | Some 7 ->
-            let operand' = getComboOperand cpu operand
-            let shift = pown 2 operand'
-                // if (operand' - 1 = 0) then 1 else 2 <<< (operand' - 1)
-            // printfn "cpu: %A" cpu
-            // printfn "operand: %A, operand': %A, shift: %A" operand operand' shift
-            let res = cpu.A / shift
-            Some { cpu with C = res; PC = cpu.PC+2 }
+                // out
+                | 5L ->
+                    let combo = (getComboOperand cpu operand) % 8L |> int
+                    true, { cpu with PC = cpu.PC + 2 ; Output = combo :: cpu.Output }
 
+                // bdv
+                | 6L ->
+                    let operand' = getComboOperand cpu operand
+                    let shift = pown 2 (int operand')
+                    let res = cpu.A / (int64 shift)
+                    true, { cpu with B = res; PC = cpu.PC+2 }
 
-        | unexpected -> failwith <| sprintf "Unexpected opcode: %A" unexpected
-        
+                // cdv
+                | 7L ->
+                    let operand' = getComboOperand cpu operand
+                    let shift = pown 2 (int operand')
+                    let res = cpu.A / (int64 shift)
+                    true, { cpu with C = res; PC = cpu.PC+2 }
 
+                | unexpected -> failwith <| sprintf "Unexpected opcode: %A" unexpected
 
 let rec run (cpu,program) =
     match nextInstruction program cpu with
-        | None -> ()
-        | Some cpu' -> run (cpu',program)
+        | false,cpu' -> cpu'
+        | true, cpu' -> run (cpu',program)
+
+//let data = readFile "test.txt"
+//let data = readFile "test2.txt"
+
+let data = readFile "input.txt"
 
 run data
+|> (fun c -> c.Output |> List.rev)
+|> List.map string
+|> List.reduceBack (fun x acc -> x + "," + acc)
+|> printfn "Part 1: %s"
+
+
+let program' = Map.toList (snd data) |> List.sort |> List.map snd |> List.map int
+
+let basecpu = { A=0; B=0; C=0; PC=0; Output= [] }
+let rec cursed p a depth =
+    let mutable res = []
+    if depth > List.length p then res
+    else
+        let tmp = a * 8L
+        for i = 0 to 7 do
+            let tmpRes = run ({basecpu with A=tmp+(int64 i) }, (snd data)) |> fun c -> c.Output |> List.rev
+            let p' = List.rev p |> List.take (min (List.length p) (depth + 1)) |> List.rev
+            if tmpRes = p' || List.skip 1 tmpRes = p' then
+                if (depth + 1 = List.length p) then
+                    res <- res @ [tmp+ (int64 i)]
+                res <- res @ (cursed p (tmp + (int64 i)) (depth+1))
+        res
+
+let res = cursed program' 0L 0
+
+res
+|> List.min
+|> printfn "Part 2: %A" 
 
