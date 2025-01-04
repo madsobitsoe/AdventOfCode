@@ -1,3 +1,4 @@
+#time
 open System.IO
 open System.Text.RegularExpressions
 
@@ -134,8 +135,8 @@ let rec corruptAndSearch nextDrops avoid nodes =
                 | None -> failwith <| sprintf "Couldn't find goal in path!"
                 | Some (None) -> d
                 | Some (Some cost) ->
-                    printfn "Dropping byte at %A" d
-                    printfn "found path with cost %A" cost
+                    // printfn "Dropping byte at %A" d
+                    // printfn "found path with cost %A" cost
                     corruptAndSearch ds avoid' nodes'
                 
 corruptAndSearch restOfTheDrops corruptedMap nodes
